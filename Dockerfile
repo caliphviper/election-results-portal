@@ -8,5 +8,6 @@ ENV APP_ENV=production
 ENV APP_DEBUG=false
 ENV LOG_CHANNEL=stderr
 ENV COMPOSER_ALLOW_SUPERUSER=1
+ENV WEBROOT="/var/www/html/public"
 
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
