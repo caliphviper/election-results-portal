@@ -46,7 +46,7 @@ In `.env`, set:
 
 
 
-## PDB_CONNECTION=SQLITE
+## DB_CONNECTION=SQLITE
 
 Then run migrations and seed the database:
 ```bash
