@@ -1,15 +1,17 @@
-FROM tangramor/nginx-php8-fpm:php8.4.7_withoutNodejs
+FROM webdevops/php-nginx:8.4
 
-COPY . /var/www/html
-
-RUN composer install --no-dev --optimize-autoloader --no-interaction
-
+ENV WEB_DOCUMENT_ROOT=/app/public
 ENV APP_ENV=production
 ENV APP_DEBUG=false
 ENV LOG_CHANNEL=stderr
-ENV COMPOSER_ALLOW_SUPERUSER=1
-ENV WEBROOT="/var/www/html/public"
 
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+WORKDIR /app
 
-CMD ["/var/www/html/docker-entrypoint.sh"]
+COPY . .
+
+RUN composer install --no-dev --optimize-autoloader --no-interaction
+
+COPY docker/entrypoint.d/migrate.sh /opt/docker/provision/entrypoint.d/migrate.sh
+RUN chmod +x /opt/docker/provision/entrypoint.d/migrate.sh
+
+RUN chown -R application:application /app
