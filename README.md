@@ -1,58 +1,68 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Election Results Portal
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A Laravel-based web application for viewing, summarizing, and recording polling unit election results — built around a dataset of 2011 dummy election results for Delta State, Nigeria (polling units, wards, and LGAs).
 
-## About Laravel
+## Overview
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Nigeria's electoral results structure is hierarchical: **Polling Units** sit under **Wards**, which sit under **Local Government Areas (LGAs)**, which sit under **States**. This project provides three core tools for working with that data:
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+1. **Polling Unit Lookup** — Select a State, LGA, Ward, and Polling Unit (via chained dropdowns) to view that polling unit's individual party results.
+2. **LGA Result Summary** — Select a State and LGA to view a summed total of all party scores across every polling unit in that LGA, computed live from polling-unit-level data (not from a pre-announced results table).
+3. **Add New Polling Unit** — Register a new polling unit under a chosen Ward, and record its results for all parties in one submission.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Tech Stack
 
-## Learning Laravel
+- **Backend:** Laravel 12 (PHP)
+- **Database:** SQLite (local development)
+- **Frontend:** Blade templates, vanilla JavaScript (chained AJAX dropdowns)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Data Model
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+The database schema follows the original dataset's structure:
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+| Table | Description |
+|---|---|
+| `states` | List of states |
+| `lga` | Local Government Areas, linked to a state |
+| `ward` | Wards, linked to an LGA |
+| `polling_unit` | Polling units, linked to a ward (via `uniquewardid`) and LGA |
+| `announced_pu_results` | Individual party scores per polling unit (9 rows per unit) |
+| `announced_lga_results` | Pre-announced LGA-level results, used only as a separate cross-check dataset |
 
-## Agentic Development
+**Note:** `polling_unit.uniquewardid` — not `ward_id` — is the reliable foreign key linking a polling unit to its ward, since `ward_id` values are largely unset (`0`) in the source dataset.
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## Setup
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+git clone https://github.com/caliphviper/election-results-portal.git
+cd election-results-portal
+composer install
+cp .env.example .env
+php artisan key:generate
+touch database/database.sqlite
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+In `.env`, set:
 
-## Contributing
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
 
-## Code of Conduct
+## PDB_CONNECTION=SQLITE
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Then run migrations and seed the database:
+```bash
+php artisan migrate --seed
+php artisan serve
+```
 
-## Security Vulnerabilities
+Visit `http://localhost:8000` to view the homepage and navigate to each feature.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Project Structure
+
+- `app/Models/` — Eloquent models mapped to the existing (non-standard) table/column naming
+- `app/Http/Controllers/` — one controller per feature (lookup, summary, new entry)
+- `resources/views/results/` — Blade views for each feature page
+- `database/seeders/` — seed data derived from the original dataset
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Built as a technical assessment project.
