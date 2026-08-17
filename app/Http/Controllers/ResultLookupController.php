@@ -13,9 +13,9 @@ class ResultLookupController extends Controller
 {
     public function index()
     {
-        $states = State::orderBy('state_name')->get();
-
-        return view('results.lookup', compact('states'));
+        return view('results.lookup', [
+            'states' => State::withLgaData()->get(),
+        ]);
     }
 
     public function lgasByState($state)

@@ -1,33 +1,21 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Add New Polling Unit</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; }
-        select, input { width: 100%; padding: 8px; margin-bottom: 15px; box-sizing: border-box; }
-        label { font-weight: bold; display: block; margin-top: 15px; }
-        .party-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-        .party-row label { width: 80px; margin: 0; }
-        .party-row input { margin: 0; }
-        button { padding: 10px 20px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        button:disabled { background: #999; cursor: not-allowed; }
-        .success { background: #dcfce7; border: 1px solid #16a34a; padding: 12px; border-radius: 4px; margin-bottom: 20px; }
-        .error { background: #fee2e2; border: 1px solid #dc2626; padding: 12px; border-radius: 4px; margin-bottom: 20px; }
-        fieldset { border: 1px solid #ccc; border-radius: 4px; margin-top: 20px; padding: 15px; }
-    </style>
-</head>
-<body>
+@extends('layouts.app')
+
+@section('title', 'Add New Polling Unit')
+
+@section('content')
+    <p class="crumb"><a href="{{ url('/') }}">&larr; Home</a></p>
+
     <h1>Add New Polling Unit</h1>
-    <p><a href="{{ route('results.lookup') }}">&larr; Back to Polling Unit Lookup</a></p>
+    <p class="lede">Register a polling unit under an existing ward and record its score for all nine parties.</p>
 
     @if (session('success'))
-        <div class="success">{{ session('success') }}</div>
+        <div class="notice notice-ok">{{ session('success') }}</div>
     @endif
 
     @if ($errors->any())
-        <div class="error">
-            <ul style="margin:0; padding-left:18px;">
+        <div class="notice notice-bad">
+            <strong>Please correct the following:</strong>
+            <ul>
                 @foreach ($errors->all() as $error)
                     <li>{{ $error }}</li>
                 @endforeach
@@ -38,99 +26,138 @@
     <form method="POST" action="{{ route('results.new-polling-unit.store') }}">
         @csrf
 
-        <label for="state">State</label>
-        <select id="state">
-            <option value="">-- Select State --</option>
-            @foreach ($states as $state)
-                <option value="{{ $state->state_id }}">{{ $state->state_name }}</option>
-            @endforeach
-        </select>
+        <div class="card">
+            <p class="section-title">Where is this polling unit?</p>
+            <p class="section-note">Choose the ward the new unit belongs to.</p>
 
-        <label for="lga">LGA</label>
-        <select id="lga" disabled>
-            <option value="">-- Select LGA --</option>
-        </select>
-        <input type="hidden" name="lga_id" id="lga_id_hidden">
+            <div class="field">
+                <label for="state">State</label>
+                <select id="state">
+                    <option value="">-- Select State --</option>
+                    @foreach ($states as $state)
+                        <option value="{{ $state->state_id }}">{{ $state->state_name }}</option>
+                    @endforeach
+                </select>
+            </div>
 
-        <label for="ward">Ward</label>
-        <select id="ward" name="ward_uniqueid" disabled required>
-            <option value="">-- Select Ward --</option>
-        </select>
+            <div class="field">
+                <label for="lga">Local Government</label>
+                <select id="lga" disabled>
+                    <option value="">-- Select LGA --</option>
+                </select>
+                <input type="hidden" name="lga_id" id="lga_id_hidden" value="{{ old('lga_id') }}">
+            </div>
 
-        <label for="polling_unit_name">Polling Unit Name</label>
-        <input type="text" id="polling_unit_name" name="polling_unit_name" required maxlength="50">
+            <div class="field">
+                <label for="ward">Ward</label>
+                <select id="ward" name="ward_uniqueid" disabled required>
+                    <option value="">-- Select Ward --</option>
+                </select>
+            </div>
+        </div>
 
-        <label for="polling_unit_number">Polling Unit Number (optional)</label>
-        <input type="text" id="polling_unit_number" name="polling_unit_number" maxlength="50">
+        <div class="card">
+            <p class="section-title">Polling unit details</p>
+            <p class="section-note">The name is how the unit will appear in the lookup page.</p>
 
-        <fieldset>
-            <legend><strong>Party Scores</strong></legend>
-            @foreach ($parties as $party)
-                <div class="party-row">
-                    <label for="score_{{ $party }}">{{ $party }}</label>
-                    <input type="number" min="0" id="score_{{ $party }}" name="scores[{{ $party }}]" value="0" required>
-                </div>
-            @endforeach
-        </fieldset>
+            <div class="field">
+                <label for="polling_unit_name">Polling Unit Name</label>
+                <input type="text" id="polling_unit_name" name="polling_unit_name"
+                       value="{{ old('polling_unit_name') }}" required maxlength="50"
+                       placeholder="e.g. Ward 5 Primary School">
+            </div>
+
+            <div class="field">
+                <label for="polling_unit_number">
+                    Polling Unit Number <span class="hint">(optional)</span>
+                </label>
+                <input type="text" id="polling_unit_number" name="polling_unit_number"
+                       value="{{ old('polling_unit_number') }}" maxlength="50"
+                       placeholder="e.g. 8888">
+            </div>
+        </div>
+
+        <div class="card">
+            <p class="section-title">Party scores</p>
+            <p class="section-note">
+                Enter the votes recorded for each party. Leave a party at 0 if it scored nothing.
+            </p>
+
+            <div class="party-grid">
+                @foreach ($parties as $party)
+                    <div>
+                        <label for="score_{{ $party }}">{{ $party }}</label>
+                        <input type="number" min="0" id="score_{{ $party }}"
+                               name="scores[{{ $party }}]"
+                               class="score-input"
+                               value="{{ old('scores.'.$party, 0) }}" required>
+                    </div>
+                @endforeach
+            </div>
+
+            <p class="section-note" style="margin: 16px 0 0;">
+                Total votes entered: <strong id="scoreTotal">0</strong>
+            </p>
+        </div>
 
         <button type="submit" id="submitBtn" disabled>Save Polling Unit</button>
+        <span class="hint" id="submitHint" style="margin-left:10px;">Select a ward to continue.</span>
     </form>
+@endsection
 
-    <script>
-        const lgaSelect = document.getElementById('lga');
-        const lgaHidden = document.getElementById('lga_id_hidden');
-        const wardSelect = document.getElementById('ward');
-        const submitBtn = document.getElementById('submitBtn');
+@section('scripts')
+<script>
+    const stateSelect = document.getElementById('state');
+    const lgaSelect = document.getElementById('lga');
+    const lgaHidden = document.getElementById('lga_id_hidden');
+    const wardSelect = document.getElementById('ward');
+    const submitBtn = document.getElementById('submitBtn');
+    const submitHint = document.getElementById('submitHint');
+    const scoreTotal = document.getElementById('scoreTotal');
 
-        function resetSelect(select, placeholder) {
-            select.innerHTML = `<option value="">${placeholder}</option>`;
-            select.disabled = true;
-        }
+    function updateSubmitState() {
+        const ready = Boolean(wardSelect.value);
+        submitBtn.disabled = !ready;
+        submitHint.textContent = ready ? '' : 'Select a ward to continue.';
+    }
 
-        function updateSubmitState() {
-            submitBtn.disabled = !wardSelect.value;
-        }
+    function updateScoreTotal() {
+        const sum = [...document.querySelectorAll('.score-input')]
+            .reduce((total, input) => total + (Number(input.value) || 0), 0);
 
-        document.getElementById('state').addEventListener('change', async function () {
-            resetSelect(lgaSelect, '-- Select LGA --');
-            resetSelect(wardSelect, '-- Select Ward --');
-            lgaHidden.value = '';
-            updateSubmitState();
+        scoreTotal.textContent = num(sum);
+    }
 
-            if (!this.value) return;
+    stateSelect.addEventListener('change', async function () {
+        resetSelect(lgaSelect, '-- Select LGA --');
+        resetSelect(wardSelect, '-- Select Ward --');
+        lgaHidden.value = '';
+        updateSubmitState();
 
-            const res = await fetch(`/api/lgas/${this.value}`);
-            const lgas = await res.json();
+        if (!this.value) return;
 
-            lgas.forEach(lga => {
-                const opt = document.createElement('option');
-                opt.value = lga.lga_id;
-                opt.textContent = lga.lga_name;
-                lgaSelect.appendChild(opt);
-            });
-            lgaSelect.disabled = false;
-        });
+        const lgas = await getJson(`/api/lgas/${this.value}`);
+        fillSelect(lgaSelect, lgas, l => l.lga_id, l => l.lga_name);
+    });
 
-        lgaSelect.addEventListener('change', async function () {
-            resetSelect(wardSelect, '-- Select Ward --');
-            lgaHidden.value = this.value;
-            updateSubmitState();
+    lgaSelect.addEventListener('change', async function () {
+        resetSelect(wardSelect, '-- Select Ward --');
+        lgaHidden.value = this.value;
+        updateSubmitState();
 
-            if (!this.value) return;
+        if (!this.value) return;
 
-            const res = await fetch(`/api/wards/${this.value}`);
-            const wards = await res.json();
+        const wards = await getJson(`/api/wards/${this.value}`);
+        fillSelect(wardSelect, wards, w => w.uniqueid, w => w.ward_name);
+    });
 
-            wards.forEach(ward => {
-                const opt = document.createElement('option');
-                opt.value = ward.uniqueid;
-                opt.textContent = ward.ward_name;
-                wardSelect.appendChild(opt);
-            });
-            wardSelect.disabled = false;
-        });
+    wardSelect.addEventListener('change', updateSubmitState);
 
-        wardSelect.addEventListener('change', updateSubmitState);
-    </script>
-</body>
-</html>
+    document.querySelectorAll('.score-input').forEach(input => {
+        input.addEventListener('input', updateScoreTotal);
+    });
+
+    updateScoreTotal();
+    autoSelectIfOnlyOption(stateSelect);
+</script>
+@endsection

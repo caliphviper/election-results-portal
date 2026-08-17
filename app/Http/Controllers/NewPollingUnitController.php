@@ -14,10 +14,8 @@ class NewPollingUnitController extends Controller
 
     public function create()
     {
-        $states = State::orderBy('state_name')->get();
-
         return view('results.new-polling-unit', [
-            'states' => $states,
+            'states' => State::withLgaData()->get(),
             'parties' => $this->parties,
         ]);
     }
@@ -33,7 +31,7 @@ class NewPollingUnitController extends Controller
             'scores.*' => 'required|integer|min:0',
         ]);
 
-        DB::transaction(function () use ($validated) {
+        $pollingUnit = DB::transaction(function () use ($validated) {
             // work out the next polling_unit_id within this ward
             $nextId = PollingUnit::where('uniquewardid', $validated['ward_uniqueid'])
                 ->max('polling_unit_id');
@@ -58,8 +56,14 @@ class NewPollingUnitController extends Controller
                     'user_ip_address' => request()->ip(),
                 ]);
             }
+
+            return $pollingUnit;
         });
 
-        return redirect()->route('results.new-polling-unit')->with('success', 'Polling unit and results saved successfully.');
+        return redirect()->route('results.new-polling-unit')->with('success', sprintf(
+            '"%s" was added successfully, with scores recorded for %d parties.',
+            $pollingUnit->polling_unit_name,
+            count($validated['scores'])
+        ));
     }
 }

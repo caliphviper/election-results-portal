@@ -26,4 +26,15 @@ class Lga extends Model
     {
         return $this->hasMany(PollingUnit::class, 'lga_id', 'lga_id');
     }
+
+    /**
+     * How many polling units feed a given LGA's summed total, so the summary
+     * page can say what the figures are built from.
+     */
+    public static function pollingUnitCount($lgaId): int
+    {
+        return PollingUnit::where('lga_id', $lgaId)
+            ->whereIn('uniqueid', AnnouncedPuResult::query()->select('polling_unit_uniqueid'))
+            ->count();
+    }
 }

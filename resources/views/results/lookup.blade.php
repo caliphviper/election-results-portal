@@ -1,133 +1,181 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Polling Unit Result Lookup</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; }
-        select { width: 100%; padding: 8px; margin-bottom: 15px; }
-        label { font-weight: bold; display: block; margin-top: 15px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-        th { background: #f4f4f4; }
-    </style>
-</head>
-<body>
-    <h1>Polling Unit Result Lookup</h1>
+@extends('layouts.app')
 
-    <label for="state">State</label>
-    <select id="state">
-        <option value="">-- Select State --</option>
-        @foreach ($states as $state)
-            <option value="{{ $state->state_id }}">{{ $state->state_name }}</option>
-        @endforeach
-    </select>
+@section('title', 'Polling Unit Lookup')
 
-    <label for="lga">LGA</label>
-    <select id="lga" disabled>
-        <option value="">-- Select LGA --</option>
-    </select>
+@section('content')
+    <p class="crumb"><a href="{{ url('/') }}">&larr; Home</a></p>
 
-    <label for="ward">Ward</label>
-    <select id="ward" disabled>
-        <option value="">-- Select Ward --</option>
-    </select>
+    <h1>Polling Unit Lookup</h1>
+    <p class="lede">Work down from State to Polling Unit to see the party scores announced at that unit.</p>
 
-    <label for="pollingUnit">Polling Unit</label>
-    <select id="pollingUnit" disabled>
-        <option value="">-- Select Polling Unit --</option>
-    </select>
+    <div class="card">
+        <div class="field">
+            <label for="state">State</label>
+            <select id="state">
+                <option value="">-- Select State --</option>
+                @foreach ($states as $state)
+                    <option value="{{ $state->state_id }}">{{ $state->state_name }}</option>
+                @endforeach
+            </select>
+        </div>
+
+        <div class="field">
+            <label for="lga">Local Government</label>
+            <select id="lga" disabled>
+                <option value="">-- Select LGA --</option>
+            </select>
+        </div>
+
+        <div class="field">
+            <label for="ward">Ward</label>
+            <select id="ward" disabled>
+                <option value="">-- Select Ward --</option>
+            </select>
+        </div>
+
+        <div class="field">
+            <label for="pollingUnit">Polling Unit</label>
+            <select id="pollingUnit" disabled>
+                <option value="">-- Select Polling Unit --</option>
+            </select>
+        </div>
+    </div>
 
     <div id="resultsContainer"></div>
+@endsection
 
-    <script>
-        const lgaSelect = document.getElementById('lga');
-        const wardSelect = document.getElementById('ward');
-        const puSelect = document.getElementById('pollingUnit');
-        const resultsContainer = document.getElementById('resultsContainer');
+@section('scripts')
+<script>
+    const stateSelect = document.getElementById('state');
+    const lgaSelect = document.getElementById('lga');
+    const wardSelect = document.getElementById('ward');
+    const puSelect = document.getElementById('pollingUnit');
+    const resultsContainer = document.getElementById('resultsContainer');
 
-        function resetSelect(select, placeholder) {
-            select.innerHTML = `<option value="">${placeholder}</option>`;
-            select.disabled = true;
+    function clearFrom(...selects) {
+        selects.forEach(([select, placeholder]) => resetSelect(select, placeholder));
+        resultsContainer.innerHTML = '';
+    }
+
+    stateSelect.addEventListener('change', async function () {
+        clearFrom([lgaSelect, '-- Select LGA --'], [wardSelect, '-- Select Ward --'], [puSelect, '-- Select Polling Unit --']);
+
+        if (!this.value) return;
+
+        try {
+            const lgas = await getJson(`/api/lgas/${this.value}`);
+            fillSelect(lgaSelect, lgas, l => l.lga_id, l => l.lga_name);
+        } catch (e) {
+            showError(resultsContainer, e);
+        }
+    });
+
+    lgaSelect.addEventListener('change', async function () {
+        clearFrom([wardSelect, '-- Select Ward --'], [puSelect, '-- Select Polling Unit --']);
+
+        if (!this.value) return;
+
+        try {
+            const wards = await getJson(`/api/wards/${this.value}`);
+            fillSelect(wardSelect, wards, w => w.uniqueid, w => w.ward_name);
+        } catch (e) {
+            showError(resultsContainer, e);
+        }
+    });
+
+    wardSelect.addEventListener('change', async function () {
+        clearFrom([puSelect, '-- Select Polling Unit --']);
+
+        if (!this.value) return;
+
+        try {
+            const units = await getJson(`/api/polling-units/${this.value}`);
+            fillSelect(
+                puSelect,
+                units,
+                u => u.uniqueid,
+                u => u.polling_unit_name || u.polling_unit_number || `Polling Unit ${u.polling_unit_id}`
+            );
+        } catch (e) {
+            showError(resultsContainer, e);
+        }
+    });
+
+    puSelect.addEventListener('change', async function () {
+        resultsContainer.innerHTML = '';
+
+        if (!this.value) return;
+
+        const unitName = this.options[this.selectedIndex].textContent;
+        const wardName = wardSelect.options[wardSelect.selectedIndex].textContent;
+        const lgaName = lgaSelect.options[lgaSelect.selectedIndex].textContent;
+
+        showLoading(resultsContainer, 'Loading results...');
+
+        let results;
+
+        try {
+            results = await getJson(`/api/polling-unit-results/${this.value}`);
+        } catch (e) {
+            showError(resultsContainer, e);
+            return;
         }
 
-        document.getElementById('state').addEventListener('change', async function () {
-            resetSelect(lgaSelect, '-- Select LGA --');
-            resetSelect(wardSelect, '-- Select Ward --');
-            resetSelect(puSelect, '-- Select Polling Unit --');
-            resultsContainer.innerHTML = '';
+        if (results.length === 0) {
+            resultsContainer.innerHTML = `
+                <div class="card">
+                    <p class="section-title">${unitName}</p>
+                    <p class="empty">No results have been announced for this polling unit yet.</p>
+                </div>`;
+            return;
+        }
 
-            if (!this.value) return;
+        const total = results.reduce((sum, r) => sum + Number(r.party_score), 0);
+        const top = Math.max(...results.map(r => Number(r.party_score)));
 
-            const res = await fetch(`/api/lgas/${this.value}`);
-            const lgas = await res.json();
+        const rows = results
+            .slice()
+            .sort((a, b) => b.party_score - a.party_score)
+            .map(r => {
+                const score = Number(r.party_score);
+                const share = total ? (score / total * 100) : 0;
+                const width = top ? (score / top * 100) : 0;
 
-            lgas.forEach(lga => {
-                const opt = document.createElement('option');
-                opt.value = lga.lga_id;
-                opt.textContent = lga.lga_name;
-                lgaSelect.appendChild(opt);
-            });
-            lgaSelect.disabled = false;
-        });
+                return `
+                    <tr class="${score === top ? 'leader' : ''}">
+                        <td>${r.party_abbreviation}</td>
+                        <td class="num">${num(score)}</td>
+                        <td class="num">${share.toFixed(1)}%</td>
+                        <td class="bar-cell"><div class="bar" style="width:${width}%"></div></td>
+                    </tr>`;
+            })
+            .join('');
 
-        lgaSelect.addEventListener('change', async function () {
-            resetSelect(wardSelect, '-- Select Ward --');
-            resetSelect(puSelect, '-- Select Polling Unit --');
-            resultsContainer.innerHTML = '';
+        resultsContainer.innerHTML = `
+            <div class="card">
+                <p class="section-title">${unitName}</p>
+                <p class="section-note">${wardName} Ward &middot; ${lgaName} LGA</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Party</th>
+                            <th class="num">Score</th>
+                            <th class="num">Share</th>
+                            <th class="bar-cell"></th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                    <tfoot>
+                        <tr>
+                            <td>Total votes</td>
+                            <td class="num">${num(total)}</td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>`;
+    });
 
-            if (!this.value) return;
-
-            const res = await fetch(`/api/wards/${this.value}`);
-            const wards = await res.json();
-
-            wards.forEach(ward => {
-                const opt = document.createElement('option');
-                opt.value = ward.uniqueid;
-                opt.textContent = ward.ward_name;
-                wardSelect.appendChild(opt);
-            });
-            wardSelect.disabled = false;
-        });
-
-        wardSelect.addEventListener('change', async function () {
-            resetSelect(puSelect, '-- Select Polling Unit --');
-            resultsContainer.innerHTML = '';
-
-            if (!this.value) return;
-
-            const res = await fetch(`/api/polling-units/${this.value}`);
-            const units = await res.json();
-
-            units.forEach(pu => {
-                const opt = document.createElement('option');
-                opt.value = pu.uniqueid;
-                opt.textContent = pu.polling_unit_name ?? pu.polling_unit_number ?? `PU #${pu.polling_unit_id}`;
-                puSelect.appendChild(opt);
-            });
-            puSelect.disabled = false;
-        });
-
-        puSelect.addEventListener('change', async function () {
-            resultsContainer.innerHTML = '';
-
-            if (!this.value) return;
-
-            const res = await fetch(`/api/polling-unit-results/${this.value}`);
-            const results = await res.json();
-
-            if (results.length === 0) {
-                resultsContainer.innerHTML = '<p>No results found for this polling unit.</p>';
-                return;
-            }
-
-            let html = '<table><thead><tr><th>Party</th><th>Score</th></tr></thead><tbody>';
-            results.forEach(r => {
-                html += `<tr><td>${r.party_abbreviation}</td><td>${r.party_score}</td></tr>`;
-            });
-            html += '</tbody></table>';
-            resultsContainer.innerHTML = html;
-        });
-    </script>
-</body>
-</html>
+    autoSelectIfOnlyOption(stateSelect);
+</script>
+@endsection
