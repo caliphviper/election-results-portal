@@ -16,6 +16,7 @@ WORKDIR /app
 # every single deploy. Scripts and the autoloader are deferred because both
 # need artisan, which arrives with the code below.
 COPY composer.json composer.lock ./
+COPY vendor ./vendor
 
 # Optional: set COMPOSER_AUTH in Render to a GitHub token to lift the anonymous
 # rate limit entirely. The build works without it.
