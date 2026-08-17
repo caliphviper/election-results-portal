@@ -63,8 +63,20 @@
 
             if (!this.value) return;
 
-            const res = await fetch(`/api/lga-summary/${this.value}`);
-            const summary = await res.json();
+            let summary;
+
+            try {
+                const res = await fetch(`/api/lga-summary/${this.value}`);
+
+                if (!res.ok) {
+                    throw new Error(`server returned ${res.status}`);
+                }
+
+                summary = await res.json();
+            } catch (e) {
+                resultsContainer.innerHTML = `<p style="color:#b00">Could not load the summary (${e.message}). Please try again.</p>`;
+                return;
+            }
 
             if (summary.length === 0) {
                 resultsContainer.innerHTML = '<p>No results found for this LGA.</p>';
